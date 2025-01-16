@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use Illuminate\Contracts\Session\Session;
 use Shuchkin\SimpleXLSX;
 use Illuminate\Support\Arr;
 use Shuchkin\SimpleXLSXGen;
@@ -29,14 +30,15 @@ class ImportController extends Controller
             $customer = $rows[1][3];
             $total = Arr::last($rows)[7];
 
-            $data = [
+            $excelData = [
                 'header_and_footer' => [
                     'customer' => $customer,
                     'total' => $total
                 ]
             ];
+
             foreach (Arr::except($rows, [0, count($rows) - 1]) as $row) {
-                $data['body'][] = [
+                $excelData['body'][] = [
                     'due_date' => $row[6],
                     'invoice_amount' => $row[7],
                     'invoice' => $row[4],
@@ -44,16 +46,18 @@ class ImportController extends Controller
                 ];
             }
 
-            $this->exportStatement($data);
+            session()->put('excelData', $excelData);
+
+            return view('excel.result', compact('data'));
         } else {
             return back()->withErrors(['files' => 'Failed to parse file: ' . $file->getClientOriginalName()]);
         }
-
-        return view('excel.result', compact('data'));
     }
 
-    private function exportStatement($payload)
+    public function exportStatement()
     {
+        $payload = session()->get('excelData');
+
         $header = $payload['header_and_footer'];
         $body = $payload['body'];
         $excelHeader = [
@@ -100,5 +104,7 @@ class ImportController extends Controller
         SimpleXLSXGen::fromArray($excelData)
             ->mergeCells('A6:J6')
             ->downloadAs(uniqid() . '.xlsx');
+
+        return view('excel.result', compact('data'));
     }
 }
