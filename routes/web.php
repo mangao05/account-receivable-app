@@ -20,3 +20,4 @@ Route::get('/', function () {
 
 Route::post('/import-excel', [ImportController::class, 'import'])->name('excel.import');
 Route::get('/export-statement', [ImportController::class, 'exportStatement'])->name('excel.export');
+Route::view('/pdf-format', 'pdf-format');

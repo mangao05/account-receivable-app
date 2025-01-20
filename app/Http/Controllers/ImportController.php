@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
-use Illuminate\Contracts\Session\Session;
 use Shuchkin\SimpleXLSX;
 use Illuminate\Support\Arr;
 use Shuchkin\SimpleXLSXGen;
 use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Contracts\Session\Session;
 
 class ImportController extends Controller
 {
@@ -27,28 +28,34 @@ class ImportController extends Controller
                 'filename' => $file->getClientOriginalName(),
                 'rows' => $rows
             ];
-            $customer = $rows[1][3];
-            $total = Arr::last($rows)[7];
+            $rows = array_values(Arr::except($rows, 0));
 
-            $excelData = [
-                'header_and_footer' => [
-                    'customer' => $customer,
-                    'total' => $total
-                ]
-            ];
+            $excelData = [];
 
-            foreach (Arr::except($rows, [0, count($rows) - 1]) as $row) {
-                $excelData['body'][] = [
-                    'due_date' => $row[6],
-                    'invoice_amount' => $row[7],
-                    'invoice' => $row[4],
-                    'invoice_date' => $row[5]
+            foreach ($rows as $row) {
+                $excelData[$row[1]][] = [
+                    'customer_name' => $row[2],
+                    'assignment' => $row[3],
+                    'posting_date' => $row[4],
+                    'due_date' => $row[5],
+                    'amount' => $row[6],
+                    'email' => $row[7]
                 ];
             }
 
             session()->put('excelData', $excelData);
 
-            return view('excel.result', compact('data'));
+            $generatedFiles = [];  // Store paths of generated files
+            foreach ($excelData as $group => $rows) {
+                $pdf = Pdf::loadView('pdf-format', compact('rows', 'group'));
+
+                $fileName = $group . '.pdf';  // Customize as needed
+                $filePath = storage_path('app/public/pdf/' . $fileName);  // Ensure this path exists
+                $pdf->save($filePath);  // Save instead of download
+                $generatedFiles[] = $filePath;
+            }
+
+            return view('excel.result', compact('data', 'generatedFiles'));
         } else {
             return back()->withErrors(['files' => 'Failed to parse file: ' . $file->getClientOriginalName()]);
         }
